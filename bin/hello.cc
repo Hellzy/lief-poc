@@ -5,9 +5,15 @@ void hello() {
 }
 
 void goodbye() {
-    std::cout << "goodby\n";
+    std::cout << "goodbye\n";
 }
 
 int main() {
+    hello();
+    hello();
+    hello();
+    hello();
+    hello();
+    hello();
     hello();
 }
