@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 find_package(LIEF REQUIRED)
 
-add_executable(lief-instrum src/main.cc)
+add_executable(lief-instrum src/main.cc src/api.cc)
 target_link_libraries(lief-instrum LIEF::LIEF)
 
 add_subdirectory(lib)
