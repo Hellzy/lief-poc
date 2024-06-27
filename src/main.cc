@@ -50,24 +50,6 @@ bool substituteCall(binPtr_t& bin, const std::string& sym1_name, const std::stri
 
 }
 
-void hookGot(binPtr_t& bin, const std::string& sym1_name, const std::string& sym2_name) {
-    auto* got = bin->get_section(".plt.got");
-    if (!got) {
-        return;
-    }
-    auto sym2 =  bin->get_symbol(sym2_name);
-    bin->patch_pltgot(sym1_name, sym2->value());
-}
-
-void switchSyms(binPtr_t& bin, const std::string& sym1_name, const std::string& sym2_name) {
-    auto* sym1 = bin->get_symtab_symbol(sym1_name);
-    auto* sym2 = bin->get_symtab_symbol(sym2_name);
-
-    bin->remove_symtab_symbol(sym1_name);
-    bin->remove_symtab_symbol(sym2_name);
-
-}
-
 std::vector<uint8_t> extract_function(binPtr_t& bin, const std::string& fName) {
     std::vector<uint8_t> vec{};
     auto* sym = bin->get_symbol(fName);
