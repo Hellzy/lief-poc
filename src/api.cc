@@ -116,3 +116,39 @@ bool injectFromLib(binPtr_t& exeBin, binPtr_t& libBin) {
 
     return true;
 }
+
+symPtr_t addDynSym(binPtr_t& bin, std::string& symName) {
+    // Create the new symbol. value_ and size_ are 0 defaulted
+    LIEF::ELF::Symbol sym(symName);
+    sym.type(LIEF::ELF::Symbol::TYPE::FUNC);
+    sym.binding(LIEF::ELF::Symbol::BINDING::GLOBAL);
+    sym.shndx(LIEF::ELF::Symbol::SECTION_INDEX::UNDEF);
+
+    // Add the new symbol to dyn sym table
+    auto* dynsym = bin->get_section(".dynsym");
+    if (!dynsym) {
+        std::cerr << "Couldn't retrieve .dynsym section.\n";
+        return nullptr;
+    }
+    sym = bin->add_dynamic_symbol(sym);
+    return std::make_shared<decltype(sym)>(sym);
+
+}
+
+bool addReloc(binPtr_t& bin, const symPtr_t& sym, uint64_t addr) {
+    auto* relSec = bin->get_section(".rel.plt");
+    if (!relSec) {
+        std::cerr << "Couldn't retrieve .rel.plt section.\n";
+        return false;
+
+    }
+
+    LIEF::ELF::Relocation reloc;
+    reloc.address(addr);
+    reloc.addend(0);
+    reloc.type(LIEF::ELF::Relocation::TYPE::X86_64_JUMP_SLOT);
+    reloc.symbol(sym.get());
+
+    bin->add_pltgot_relocation(reloc);
+    return true;
+}
