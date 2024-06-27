@@ -68,21 +68,85 @@ void switchSyms(binPtr_t& bin, const std::string& sym1_name, const std::string& 
 
 }
 
+std::vector<uint8_t> extract_function(binPtr_t& bin, const std::string& fName) {
+    std::vector<uint8_t> vec{};
+    auto* sym = bin->get_symbol(fName);
+    if (!sym) {
+        std::cerr << "Couldn't find sym '" << fName << "'\n";
+        return vec;
+    }
+    
+    auto section = bin->section_from_virtual_address(sym->value());
+    if (!section) {
+        std::cerr << "Couldn't find section\n";
+        return vec;
+    }
+
+    uint64_t offset = sym->value() - section->virtual_address();
+    vec = std::vector<uint8_t>(section->content().begin()+offset, section->content().begin() + offset + sym->size());
+    return vec;
+}
+
+unsigned getSectionIdx(binPtr_t& bin, const std::string& sectionName) {
+    auto sections = bin->sections();
+    for (auto i = 0u; i < sections.size(); ++i) {
+        if (sections[i].name() == sectionName)
+            return i;
+    }
+
+    return 0;
+}
+
+bool injectFromLib(binPtr_t& exeBin, binPtr_t& libBin) {
+    auto* sym = libBin->get_symbol("_Z5hellov");
+    auto funcOps = extract_function(libBin, "_Z5hellov");
+
+    /*
+        // Create new section for the function
+        LIEF::ELF::Section section(".mysupernewsection", LIEF::ELF::Section::TYPE::PROGBITS);
+        section.content(funcOps);
+        auto *newSection = exeBin->add(section);
+
+        if (!newSection) {
+            std::cerr << "Returned section is nill after adding to binary\n";
+            return false;
+        }
+    */
+
+   auto* text = exeBin->text_section();
+   if (!text) {
+    std::cerr << "Couldn't find text section\n";
+    return false;
+   }
+   auto content = text->content();
+   auto newAddr = text->virtual_address() + content.size();
+   auto contentVec = std::vector<uint8_t>(content.begin(), content.end());
+   contentVec.insert(contentVec.end(), funcOps.begin(), funcOps.end());
+   text->content(contentVec);
+   text->size(text->size() + funcOps.size());
+
+    // Create new symbol entry for the function
+    LIEF::ELF::Symbol newSym(sym->name());
+    newSym.value(newAddr);
+    newSym.size(funcOps.size());
+    newSym.type(LIEF::ELF::Symbol::TYPE::FUNC);
+    newSym.binding(LIEF::ELF::Symbol::BINDING::GLOBAL);
+    newSym.shndx(getSectionIdx(exeBin, ".text"));
+    
+    auto addedSym = exeBin->add_symtab_symbol(newSym);
+    std::cout << "Added '" << sym->name() << "'\n";
+    std::cout << "Addr: " << sym->value() << "\n";
+
+    return true;
+}
+
 int main() {
-    //auto bin = LIEF::ELF::Parser::parse("../bin/hello");
-    //std::string sym_name1 = "_Z5hellov";
-    //std::string sym_name2 = "_Z7goodbyev";
+    auto libBin = LIEF::ELF::Parser::parse("lib/libhello.so");
+    auto exeBin = LIEF::ELF::Parser::parse("patchee/patchee");
 
-    auto bin = LIEF::ELF::Parser::parse("../go/app");
-    std::string sym_name1 = "math/rand.Int";
-    std::string sym_name2 = "main.Int";
+    std::cout << std::boolalpha << injectFromLib(exeBin, libBin) << '\n';
 
-    //hookGot(bin, sym_name1, sym_name2);
-    //switchSyms(bin, sym_name1, sym_name2);
-    if (!substituteCall(bin, sym_name1, sym_name2))
-        listSyms(bin);
-
-    LIEF::ELF::Builder builder(*bin);
+    LIEF::ELF::Builder builder(*exeBin);
     builder.build();
     builder.write("modified");
 

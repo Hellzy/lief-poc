@@ -7,3 +7,6 @@ find_package(LIEF REQUIRED)
 
 add_executable(lief-instrum src/main.cc)
 target_link_libraries(lief-instrum LIEF::LIEF)
+
+add_subdirectory(lib)
+add_subdirectory(patchee)
