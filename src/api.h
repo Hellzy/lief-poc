@@ -6,6 +6,7 @@
 
 using binPtr_t = std::unique_ptr<LIEF::ELF::Binary>;
 using symPtr_t = std::shared_ptr<LIEF::ELF::Symbol>;
+using relPtr_t = std::shared_ptr<LIEF::ELF::Relocation>;
 
 
 // listSyms lists all symbols contained in a binary
@@ -28,7 +29,9 @@ unsigned getSectionIdx(binPtr_t&, const std::string&);
 bool injectFromLib(binPtr_t& exeBin, binPtr_t& libBin);
 
 // addDynSym adds an entry in the ".dynsym" section of the binary
-symPtr_t addDynSym(binPtr_t&, std::string&);
+symPtr_t addDynSym(binPtr_t&, const std::string&);
 
 // addReloc adds an entry to ".rel.plt" for the specified symbol and call address
-bool addReloc(binPtr_t&, const symPtr_t&, uint64_t);
+relPtr_t addReloc(binPtr_t&, const symPtr_t&, uint64_t);
+
+bool substituteCallDyn(binPtr_t& bin, const std::string& sym1_name, const std::string& sym2_name);

@@ -117,38 +117,63 @@ bool injectFromLib(binPtr_t& exeBin, binPtr_t& libBin) {
     return true;
 }
 
-symPtr_t addDynSym(binPtr_t& bin, std::string& symName) {
+symPtr_t addDynSym(binPtr_t& bin, const std::string& symName) {
     // Create the new symbol. value_ and size_ are 0 defaulted
     LIEF::ELF::Symbol sym(symName);
     sym.type(LIEF::ELF::Symbol::TYPE::FUNC);
     sym.binding(LIEF::ELF::Symbol::BINDING::GLOBAL);
     sym.shndx(LIEF::ELF::Symbol::SECTION_INDEX::UNDEF);
 
-    // Add the new symbol to dyn sym table
-    auto* dynsym = bin->get_section(".dynsym");
-    if (!dynsym) {
-        std::cerr << "Couldn't retrieve .dynsym section.\n";
-        return nullptr;
-    }
     sym = bin->add_dynamic_symbol(sym);
     return std::make_shared<decltype(sym)>(sym);
 
 }
 
-bool addReloc(binPtr_t& bin, const symPtr_t& sym, uint64_t addr) {
-    auto* relSec = bin->get_section(".rel.plt");
-    if (!relSec) {
-        std::cerr << "Couldn't retrieve .rel.plt section.\n";
-        return false;
-
-    }
-
-    LIEF::ELF::Relocation reloc;
-    reloc.address(addr);
+relPtr_t addReloc(binPtr_t& bin, const symPtr_t& sym, uint64_t addr) {
+    LIEF::ELF::Relocation reloc(addr, LIEF::ELF::Relocation::TYPE::X86_64_JUMP_SLOT, LIEF::ELF::Relocation::ENCODING::RELA);
     reloc.addend(0);
-    reloc.type(LIEF::ELF::Relocation::TYPE::X86_64_JUMP_SLOT);
+    reloc.purpose(LIEF::ELF::Relocation::PURPOSE::PLTGOT);
     reloc.symbol(sym.get());
 
-    bin->add_pltgot_relocation(reloc);
+    reloc = bin->add_pltgot_relocation(reloc);
+    return std::make_shared<decltype(reloc)>(reloc);
+}
+
+bool substituteCallDyn(binPtr_t& bin, const std::string& sym1_name, const std::string& sym2_name) {
+    auto sym1 = bin->get_symbol(sym1_name);
+    if (!sym1) {
+        std::cerr << "Couldn't find '" << sym1_name << "'\n";
+        return false;
+    }
+
+    auto sym2 = addDynSym(bin, sym2_name);
+    if (!sym2) {
+        std::cerr << "Couldn't add dynamic symbol '" << sym2_name << "'\n";
+        return false;
+    }
+
+    auto* text = bin->get_section(".text");
+    auto text_addr = text->virtual_address();
+    auto text_content = text->content();
+
+    std::vector<uint8_t> contentVec(text_content.begin(), text_content.end());
+
+    for (auto i = 0u; i < contentVec.size(); ++i) {
+        auto instr = contentVec[i];
+        if (instr != 0xE8)
+            continue;
+
+        auto ip_addr = text_addr + i;
+        auto jmp_offset = *((int32_t*)&contentVec[i+1]);
+        // CALL (0xE8) is encoded on 5 bytes, 1 for instruction, 4 for offset
+        uint32_t call_addr = ip_addr + jmp_offset + 5;
+
+        if (call_addr == sym1->value()) {
+            auto ret = addReloc(bin, sym2, call_addr - text_addr);
+            auto fSym = bin->get_dynamic_symbol(sym2_name);
+        }
+    }
+    //text->content(contentVec);
     return true;
+
 }

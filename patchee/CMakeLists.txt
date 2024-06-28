@@ -3,6 +3,6 @@ project(lief-instrum)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set(CMAKE_CXX_FLAGS "-g -O0")
+set(CMAKE_CXX_FLAGS "-g -O0 -fPIC")
 
 add_executable(patchee main.cc)
